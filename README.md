@@ -1,4 +1,4 @@
-# getIngresosBrutos
+# getIngresosBrutos - [unmaintained]
 
 Tiny [http://phantomjs.org](phantomjs) script that generates screenshots with the taxes retentions in your bank account for the current month.
 
