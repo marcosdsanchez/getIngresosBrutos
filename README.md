@@ -1,11 +1,11 @@
 # getIngresosBrutos (Playwright Version)
 
-Automated tool to calculate "Ingresos Brutos" tax retentions from Banco Galicia Online Banking for the previous month.
+Automated tool to calculate "Ingresos Brutos" tax retentions from Banco Galicia Online Banking.
 
 ## Features
 - **Modern Stack**: Built with Node.js, TypeScript, and Playwright.
 - **Automated Login**: Handles credentials securely via environment variables.
-- **Configurable Account**: Target specific accounts via `ACCOUNT_NUMBER`.
+- **Configurable Account**: Target specific accounts via `ING_BRUTOS_ACCOUNT_NUMBER`.
 - **Optimization**: Automatically filters for "Egresos de dinero" to reduce noise.
 - **Auto-Calculation**: Filters transactions by date (previous month) and description ("Ing. brutos s/ cred") to compute the total retention amount.
 - **Privacy Focused**: No screenshots are taken or stored.
@@ -20,14 +20,22 @@ npm install
 ```
 
 ## Usage
-Set your credentials as environment variables and run the script:
 
+1. Create a `.env` file in the root directory (based on `.env.example`):
 ```bash
-export DOCUMENTO=YOUR_DNI
-export PASSWORD=YOUR_PASSWORD
-export USER=YOUR_USERNAME 
-export ACCOUNT_NUMBER="4017888-3" # Core number of the account to check
+cp .env.example .env
+```
 
+2. Edit `.env` with your credentials:
+```ini
+ING_BRUTOS_DOCUMENTO=YOUR_DNI
+ING_BRUTOS_PASSWORD=YOUR_PASSWORD
+ING_BRUTOS_USER=YOUR_USERNAME 
+ING_BRUTOS_ACCOUNT_NUMBER="4017888-3" 
+```
+
+3. Run the script:
+```bash
 npm start
 ```
 

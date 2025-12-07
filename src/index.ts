@@ -1,14 +1,15 @@
+import 'dotenv/config';
 import { chromium, type Browser, type Page } from 'playwright';
 
 (async () => {
     // 1. Validation
-    const dni = process.env.DOCUMENTO;
-    const password = process.env.PASSWORD;
-    const user = process.env.USER;
-    const accountTarget = process.env.ACCOUNT_NUMBER;
+    const dni = process.env.ING_BRUTOS_DOCUMENTO;
+    const password = process.env.ING_BRUTOS_PASSWORD;
+    const user = process.env.ING_BRUTOS_USER;
+    const accountTarget = process.env.ING_BRUTOS_ACCOUNT_NUMBER;
 
     if (!dni || !password || !user || !accountTarget) {
-        console.error('Error: Please set DOCUMENTO, PASSWORD, USER, and ACCOUNT_NUMBER environment variables.');
+        console.error('Error: Please set ING_BRUTOS_DOCUMENTO, ING_BRUTOS_PASSWORD, ING_BRUTOS_USER, and ING_BRUTOS_ACCOUNT_NUMBER environment variables in your .env file.');
         process.exit(1);
     }
 
