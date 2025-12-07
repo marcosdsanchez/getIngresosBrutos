@@ -1,8 +1,90 @@
 import 'dotenv/config';
 import { chromium, type Browser, type Page } from 'playwright';
 
+/**
+ * Parse command line arguments
+ */
+function parseArgs(): { fromDate: Date; toDate: Date } {
+    const args = process.argv.slice(2);
+    let fromDateStr: string | null = null;
+    let toDateStr: string | null = null;
+
+    // Parse arguments
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--help' || args[i] === '-h') {
+            console.log(`
+Usage: npm start -- [options]
+
+Options:
+  --from <date>    Start date in DD/MM/YYYY format (default: first day of previous month)
+  --to <date>      End date in DD/MM/YYYY format (default: last day of previous month)
+  --help, -h       Show this help message
+
+Examples:
+  npm start -- --from 01/11/2025 --to 30/11/2025
+  npm start -- --from 15/11/2025
+  npm start
+            `);
+            process.exit(0);
+        } else if (args[i] === '--from' && i + 1 < args.length) {
+            fromDateStr = args[i + 1] ?? null;
+            i++;
+        } else if (args[i] === '--to' && i + 1 < args.length) {
+            toDateStr = args[i + 1] ?? null;
+            i++;
+        }
+    }
+
+    // Default to previous month if not specified
+    const today = new Date();
+    const previousMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastDayOfPreviousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    let fromDate: Date;
+    let toDate: Date;
+
+    // Parse from date
+    if (fromDateStr) {
+        const match = fromDateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (!match) {
+            console.error(`Error: Invalid --from date format. Expected DD/MM/YYYY, got: ${fromDateStr}`);
+            process.exit(1);
+        }
+        const [, day, month, year] = match;
+        fromDate = new Date(parseInt(year!), parseInt(month!) - 1, parseInt(day!));
+    } else {
+        fromDate = previousMonthDate;
+    }
+
+    // Parse to date
+    if (toDateStr) {
+        const match = toDateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (!match) {
+            console.error(`Error: Invalid --to date format. Expected DD/MM/YYYY, got: ${toDateStr}`);
+            process.exit(1);
+        }
+        const [, day, month, year] = match;
+        toDate = new Date(parseInt(year!), parseInt(month!) - 1, parseInt(day!));
+    } else {
+        toDate = lastDayOfPreviousMonth;
+    }
+
+    // Validate date range
+    if (fromDate > toDate) {
+        console.error('Error: --from date must be before or equal to --to date');
+        process.exit(1);
+    }
+
+    return { fromDate, toDate };
+}
+
 (async () => {
-    // 1. Validation
+    // 1. Parse command line arguments
+    const { fromDate, toDate } = parseArgs();
+
+    console.log(`Date Range: ${fromDate.toLocaleDateString('es-AR')} to ${toDate.toLocaleDateString('es-AR')}`);
+
+    // 2. Validation
     const dni = process.env.ING_BRUTOS_DOCUMENTO;
     const password = process.env.ING_BRUTOS_PASSWORD;
     const user = process.env.ING_BRUTOS_USER;
@@ -13,18 +95,10 @@ import { chromium, type Browser, type Page } from 'playwright';
         process.exit(1);
     }
 
-    // 2. Browser Setup
+    // 3. Browser Setup
     const browser: Browser = await chromium.launch({ headless: false }); // Headless: false for debugging/visibility
     const context = await browser.newContext();
     const page: Page = await context.newPage();
-
-    // Setup Dates
-    const today = new Date();
-    const previousMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const targetMonth = previousMonthDate.getMonth(); // 0-11
-    const targetYear = previousMonthDate.getFullYear();
-
-    console.log(`Targeting Month: ${targetMonth + 1}/${targetYear}`);
 
     try {
         console.log('Navigating to login page...');
@@ -195,10 +269,10 @@ import { chromium, type Browser, type Page } from 'playwright';
                 const transDate = new Date(year!, month! - 1, day);
 
                 // Filter by Attributes
-                const isTargetMonth = (transDate.getMonth() === targetMonth) && (transDate.getFullYear() === targetYear);
+                const isInDateRange = (transDate >= fromDate && transDate <= toDate);
                 const isTaxRetention = /Ing\.? Brutos S\/? Cred/i.test(description);
 
-                if (isTargetMonth && isTaxRetention) {
+                if (isInDateRange && isTaxRetention) {
                     // Parse Amount: -$10.035,36 -> -10035.36
                     const cleanAmount = amountStr.replace(/[$.]/g, '').replace(',', '.');
                     const value = Math.abs(parseFloat(cleanAmount)); // Use absolute value for total
@@ -210,14 +284,14 @@ import { chromium, type Browser, type Page } from 'playwright';
             }
 
             console.log('-------------------------------');
-            console.log(`Summary for ${previousMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' })}:`);
+            console.log(`Summary for ${fromDate.toLocaleDateString('es-AR')} to ${toDate.toLocaleDateString('es-AR')}:`);
             console.log(`Total "Ing. Brutos s/ cred": $${totalRetention.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
 
             // Visual Evidence removed per user request
             // await page.screenshot({ path: 'final_calculation.png' });
 
             // Final Output for User
-            console.log(`\n>>> TOTAL RETENTIONS (${targetMonth + 1}/${targetYear}): $${totalRetention.toFixed(2)} <<<\n`);
+            console.log(`\n>>> TOTAL RETENTIONS (${fromDate.toLocaleDateString('es-AR')} to ${toDate.toLocaleDateString('es-AR')}): $${totalRetention.toFixed(2)} <<<\n`);
 
 
 
