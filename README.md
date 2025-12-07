@@ -1,15 +1,42 @@
-# getIngresosBrutos - [unmaintained]
+# getIngresosBrutos (Playwright Version)
 
-Tiny [http://phantomjs.org](phantomjs) script that generates screenshots with the taxes retentions in your bank account for the current month.
+Automated tool to calculate "Ingresos Brutos" tax retentions from Banco Galicia Online Banking for the previous month.
 
-## How to use
+## Features
+- **Modern Stack**: Built with Node.js, TypeScript, and Playwright.
+- **Automated Login**: Handles credentials securely via environment variables.
+- **Configurable Account**: Target specific accounts via `ACCOUNT_NUMBER`.
+- **Optimization**: Automatically filters for "Egresos de dinero" to reduce noise.
+- **Auto-Calculation**: Filters transactions by date (previous month) and description ("Ing. brutos s/ cred") to compute the total retention amount.
+- **Privacy Focused**: No screenshots are taken or stored.
 
-You need to create environment variables with your login information to your 'Banco de Galicia' Account.
+## Prerequisites
+- Node.js (v18+)
+- Banco Galicia Online Banking Credentials
 
-1 - export DOCUMENTO=111111111
+## Installation
+```bash
+npm install
+```
 
-2 - export PASSWORD=1111
+## Usage
+Set your credentials as environment variables and run the script:
 
-3 - Run `phantomjs getIngresosBrutos.coffee`
+```bash
+export DOCUMENTO=YOUR_DNI
+export PASSWORD=YOUR_PASSWORD
+export USER=YOUR_USERNAME 
+export ACCOUNT_NUMBER="4017888-3" # Core number of the account to check
 
-4 - Enjoy :)
+npm start
+```
+
+## Output
+The script will output the list of detected retention transactions and a final summary:
+
+```text
+Summary for noviembre de 2025:
+Total "Ing. Brutos s/ cred": $87.671,87
+
+>>> TOTAL RETENTIONS (11/2025): $87671.87 <<<
+```
