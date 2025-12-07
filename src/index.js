@@ -1,5 +1,15 @@
 import 'dotenv/config';
 import { chromium } from 'playwright';
+// Constants
+const WAIT_AFTER_ACCOUNT_CLICK = 5000;
+const WAIT_FOR_TRANSACTIONS = 5000;
+const WAIT_AFTER_FILTER = 3000;
+/**
+ * Validate if a date is valid
+ */
+function isValidDate(date) {
+    return date instanceof Date && !isNaN(date.getTime());
+}
 /**
  * Parse command line arguments
  */
@@ -7,6 +17,7 @@ function parseArgs() {
     const args = process.argv.slice(2);
     let fromDateStr = null;
     let toDateStr = null;
+    let headless = false;
     // Parse arguments
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--help' || args[i] === '-h') {
@@ -16,11 +27,13 @@ Usage: npm start -- [options]
 Options:
   --from <date>    Start date in DD/MM/YYYY format (default: first day of previous month)
   --to <date>      End date in DD/MM/YYYY format (default: last day of previous month)
+  --headless       Run browser in headless mode (no UI)
   --help, -h       Show this help message
 
 Examples:
   npm start -- --from 01/11/2025 --to 30/11/2025
   npm start -- --from 15/11/2025
+  npm start -- --headless
   npm start
             `);
             process.exit(0);
@@ -32,6 +45,9 @@ Examples:
         else if (args[i] === '--to' && i + 1 < args.length) {
             toDateStr = args[i + 1] ?? null;
             i++;
+        }
+        else if (args[i] === '--headless') {
+            headless = true;
         }
     }
     // Default to previous month if not specified
@@ -49,6 +65,10 @@ Examples:
         }
         const [, day, month, year] = match;
         fromDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (!isValidDate(fromDate)) {
+            console.error(`Error: Invalid --from date: ${fromDateStr}`);
+            process.exit(1);
+        }
     }
     else {
         fromDate = previousMonthDate;
@@ -62,6 +82,10 @@ Examples:
         }
         const [, day, month, year] = match;
         toDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (!isValidDate(toDate)) {
+            console.error(`Error: Invalid --to date: ${toDateStr}`);
+            process.exit(1);
+        }
     }
     else {
         toDate = lastDayOfPreviousMonth;
@@ -71,12 +95,13 @@ Examples:
         console.error('Error: --from date must be before or equal to --to date');
         process.exit(1);
     }
-    return { fromDate, toDate };
+    return { fromDate, toDate, headless };
 }
 (async () => {
     // 1. Parse command line arguments
-    const { fromDate, toDate } = parseArgs();
+    const { fromDate, toDate, headless } = parseArgs();
     console.log(`Date Range: ${fromDate.toLocaleDateString('es-AR')} to ${toDate.toLocaleDateString('es-AR')}`);
+    console.log(`Headless Mode: ${headless ? 'enabled' : 'disabled'}`);
     // 2. Validation
     const dni = process.env.ING_BRUTOS_DOCUMENTO;
     const password = process.env.ING_BRUTOS_PASSWORD;
@@ -87,7 +112,7 @@ Examples:
         process.exit(1);
     }
     // 3. Browser Setup
-    const browser = await chromium.launch({ headless: false }); // Headless: false for debugging/visibility
+    const browser = await chromium.launch({ headless });
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
@@ -156,7 +181,6 @@ Examples:
                     console.log('Clicked "Cuentas". Waiting...');
                     await page.waitForLoadState('networkidle');
                     // Try searching again
-                    // Try searching again
                     const accountElementRetry = page.getByText(accountTarget);
                     if (await accountElementRetry.count() > 0) {
                         await accountElementRetry.first().click();
@@ -169,9 +193,13 @@ Examples:
                         throw new Error('Account not found');
                     }
                 }
+                else {
+                    console.error('"Cuentas" link not visible and account not found.');
+                    throw new Error('Account not found and cannot access Cuentas section');
+                }
             }
             await page.waitForLoadState('networkidle');
-            await page.waitForTimeout(5000); // Give it a good wait
+            await page.waitForTimeout(WAIT_AFTER_ACCOUNT_CLICK);
             console.log('Post-click URL:', page.url());
             // Debug logging removed for cleaner output
             // const bodyPreview = await page.innerText('body');
@@ -198,7 +226,7 @@ Examples:
                 console.log('"Todos los movimientos" / "Movimientos" button not visible. We might be on the summary page.');
             }
             // Wait for table/list
-            await page.waitForTimeout(5000);
+            await page.waitForTimeout(WAIT_FOR_TRANSACTIONS);
             // OPTIMIZATION: Click "Egresos de dinero" to filter
             console.log('Looking for "Egresos de dinero" filter...');
             const egresosFilter = page.getByText('Egresos de dinero').first();
@@ -206,7 +234,7 @@ Examples:
                 console.log('Applying "Egresos de dinero" filter...');
                 await egresosFilter.click();
                 await page.waitForLoadState('networkidle');
-                await page.waitForTimeout(3000); // Wait for list to update
+                await page.waitForTimeout(WAIT_AFTER_FILTER);
             }
             else {
                 console.log('"Egresos de dinero" filter not found, proceeding with all transactions.');
@@ -223,7 +251,6 @@ Examples:
             const transactionPattern = /(\d{2}\/\d{2}\/\d{4})[\r\n]+([^\r\n]+)[\r\n]+([-\$0-9.,]+)/g;
             let match;
             let totalRetention = 0;
-            const foundTransactions = [];
             console.log('--- Processing Transactions ---');
             while ((match = transactionPattern.exec(containerText)) !== null) {
                 const [fullMatch, dateStr, description, amountStr] = match;
@@ -238,9 +265,12 @@ Examples:
                 if (isInDateRange && isTaxRetention) {
                     // Parse Amount: -$10.035,36 -> -10035.36
                     const cleanAmount = amountStr.replace(/[$.]/g, '').replace(',', '.');
-                    const value = Math.abs(parseFloat(cleanAmount)); // Use absolute value for total
+                    const value = Math.abs(parseFloat(cleanAmount));
+                    if (isNaN(value)) {
+                        console.warn(`[WARNING] Could not parse amount: ${amountStr}`);
+                        continue;
+                    }
                     totalRetention += value;
-                    foundTransactions.push({ date: dateStr, description, amount: value });
                     console.log(`[MATCH] ${dateStr} - ${description} - $${value.toFixed(2)}`);
                 }
             }
@@ -257,7 +287,6 @@ Examples:
         }
     }
     catch (error) {
-        console.error('An error occurred:', error);
         console.error('An error occurred:', error);
         // await page.screenshot({ path: 'error.png' });
     }

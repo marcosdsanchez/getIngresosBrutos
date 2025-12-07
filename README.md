@@ -52,19 +52,26 @@ npm start -- --from 15/11/2025
 npm start -- --help
 ```
 
+**Run in headless mode** (no browser UI):
+```bash
+npm start -- --headless
+```
+
 ### Command Line Options
 
 - `--from <date>`: Start date in DD/MM/YYYY format (default: first day of previous month)
 - `--to <date>`: End date in DD/MM/YYYY format (default: last day of previous month)
+- `--headless`: Run browser in headless mode without UI (useful for automation/servers)
 - `--help, -h`: Show help message
 
-**Note**: When no parameters are specified, the script automatically calculates retentions for the entire previous month (from day 1 to the last day).
+**Note**: When no parameters are specified, the script automatically calculates retentions for the entire previous month (from day 1 to the last day). By default, the browser runs with UI visible unless `--headless` is specified.
 
 ## Output
 The script will output the list of detected retention transactions and a final summary:
 
 ```text
 Date Range: 1/11/2025 to 30/11/2025
+Headless Mode: disabled
 Summary for 1/11/2025 to 30/11/2025:
 Total "Ing. Brutos s/ cred": $87.671,87
 
